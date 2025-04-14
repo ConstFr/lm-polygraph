@@ -134,6 +134,11 @@ def register_default_stat_calculators(
             "lm_polygraph.defaults.stat_calculator_builders.default_ClaimsExtractor",
             {"openai_model": "gpt-4o", "cache_path": "~/.cache", "language": language},
         )
+        _register(
+            ReasoningKeywordsProbs,
+            "lm_polygraph.defaults.stat_calculator_builders.default_ReasoningKeywordsProbs",
+            {"max_retries": 5, "max_length_cot": 128, "temperature": 1.0}
+        )
 
     else:
         raise NotImplementedError(f"Unknown model type: {model_type}")
