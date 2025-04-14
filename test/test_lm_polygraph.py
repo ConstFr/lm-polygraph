@@ -40,18 +40,18 @@ def run_config_with_overrides(config_name, **overrides):
 # ================= TEST CASES ==================
 
 
-# def test_just_works():
-#     exec_result = run_config_with_overrides("test_polygraph_eval")
-#     assert (
-#         exec_result.returncode == 0
-#     ), f"polygraph_eval returned code {exec_result.returncode} != 0"
+def test_just_works():
+    exec_result = run_config_with_overrides("test_polygraph_eval")
+    assert (
+        exec_result.returncode == 0
+    ), f"polygraph_eval returned code {exec_result.returncode} != 0"
 
 
-# def test_all_seq_ue():
-#     exec_result = run_config_with_overrides("test_polygraph_eval_seq_ue")
-#     assert (
-#         exec_result.returncode == 0
-#     ), f"polygraph_eval returned code {exec_result.returncode} != 0"
+def test_all_seq_ue():
+    exec_result = run_config_with_overrides("test_polygraph_eval_seq_ue")
+    assert (
+        exec_result.returncode == 0
+    ), f"polygraph_eval returned code {exec_result.returncode} != 0"
 
 
 # ================= PE ensembles ==================
