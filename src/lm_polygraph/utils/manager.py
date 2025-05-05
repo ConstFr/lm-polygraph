@@ -58,6 +58,24 @@ def _delete_nans(ue, metric):
     return clipped_ue, new_metric
 
 
+def _recombine_data(ue, gen_metric, inputs):
+    ue = np.array(ue)
+    gen_metric = np.array(gen_metric)
+
+    # np.unique() with return_counts=True?
+    recombined_inputs = defaultdict(list)
+    for i, input_text in enumerate(inputs):
+        recombined_inputs[input_text].append(i)
+
+    recombined_ue, recombined_gen_metric = [], []
+    for input_text, ids in recombined_inputs.items():
+        recombined_ue.append(ue[ids].mean())
+        # Assumes that metric is bigger for better generations!
+        recombined_gen_metric.append(gen_metric[ids].max())
+
+    return recombined_ue, recombined_gen_metric
+
+
 def order_calculators(
     stats: List[str],
     stat_calculators: Dict[str, StatCalculator],

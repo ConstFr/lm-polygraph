@@ -1,5 +1,6 @@
 import re
 import torch
+import warnings
 import numpy as np
 from collections import defaultdict
 
@@ -7,6 +8,11 @@ from typing import Dict, List, Tuple, Optional
 
 from .stat_calculator import StatCalculator
 from lm_polygraph.utils.model import WhiteboxModel
+
+import logging
+
+log = logging.getLogger("lm_polygraph")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 cot_instruction = """
@@ -18,18 +24,41 @@ Question: <QUESTION>
 Response: Let's think step by step.
 """
 
-keywords_extraction_instruction = '''
-You will be provided with a question and a multi-step response containing reasoning steps.
+keywords_extraction_instruction = ''' 
+You will be provided with a question and a multi-step response containing reasoning steps. 
 For each long reasoning step labeled "Step i:", extract the keywords, only the relevant tokens for that specific reasoning step.
-You also need to evaluate the importance of each keyword to the final answer. Please evaluate the importance score following with the keyword by (/<importance score>/) on a scale of 1 to 10, where 1 is the least critical and 10 is the most critical.
+The keywords should be relevant to question and final answer.
 If you find more than one keyword in a specific step, separate them with “;”.
-If a specific step does not contribute meaningfully to deriving the final answer (e.g., repeating information already provided in the question, introducing irrelevant assumptions or speculations), return "Step i: NO ANSWER" for that step. For example:
+For example:
 
-Question:
-<QUESTION>
-Multi-Step Response:
+######
+
+Q: Which band has more members, "We Are the Ocean" or "The Dream Academy"?
+
+Reasoning steps:
+Step 1: The question is asking which band has more members.
+Step 2: "We Are the Ocean" has five members.
+Step 3: "The Dream Academy" has three members.
+Step 4: 5 is greater than 3.
+Step 5: Therefore, "We Are the Ocean" has more members.
+Final Answer: We Are the Ocean
+
+Keywords for each reasoning step: 
+Step 1: band
+Step 2: We Are the Ocean; five
+Step 3: The Dream Academy; three
+Step 4: greater
+Step 5: We Are the Ocean
+
+######
+
+The following is your task:
+Q: <QUESTION>
+
+Reasoning steps: 
 <RESPONSE>
-Keywords for Each Reasoning Step:
+
+Keywords for each reasoning step:
 '''
 
 
@@ -72,25 +101,26 @@ def parse_response_to_dict(response: str) -> Tuple[Optional[str], Dict[str, str]
     match = re.search(r"Final Answer:\s*(.+?)\s*(?=(\n|$))", response, re.DOTALL)
     if match:
         final_answer = match.group(1).strip()
-        response_before_final_answer = response[:match.end()].strip()
+        response_after_final_answer = response[:match.end()].strip()
+        # response_before_final_answer = response[:match.start()].strip()
     else:
         return None, {}, None
 
     # Match Steps
-    matches = list(re.finditer(r"(Step \d+):", response_before_final_answer))
+    matches = list(re.finditer(r"(Step \d+):", response_after_final_answer))
     for i, match in enumerate(matches):
         start = match.start()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(response_before_final_answer)
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(response_after_final_answer)
         segment = response[start:end].strip()
         steps[match.group(1)] = segment
 
-    return_response = response_before_final_answer
+    return_response = response_after_final_answer
     return final_answer, steps, return_response
 
 
-def match_final_answer_token_ids(tokenizer, original_tokens, response_tokens, original_token_ids):
+def match_final_answer_token_ids(tokenizer, original_tokens, response_tokens, generated_ids):
     # caution
-    final_answer_tokens = tokenizer.tokenize("Final answer:")
+    final_answer_tokens = tokenizer.tokenize("Final Answer:")
 
     end_index = None
     end_index_original = None
@@ -100,7 +130,7 @@ def match_final_answer_token_ids(tokenizer, original_tokens, response_tokens, or
             end_index = i + len(final_answer_tokens)
             break
 
-    if end_index is None or end_index + 1 == len(response_tokens):
+    if end_index is None or end_index == len(response_tokens):
         return None, None
 
     for i in range(len(original_tokens) - len(final_answer_tokens) + 1):
@@ -117,9 +147,9 @@ def match_final_answer_token_ids(tokenizer, original_tokens, response_tokens, or
 
     target_tokens = response_tokens[end_index:]
 
-    final_answer_token_ids = original_token_ids[end_index_original : end_index_original + len(target_tokens)]
+    final_answer_token_ids = generated_ids[end_index_original : end_index_original + len(target_tokens)]
 
-    return end_index_original, final_answer_token_ids.data.cpu().numpy()
+    return end_index_original, final_answer_token_ids
 
 
 def predict(prompt, model, tokenizer, max_length_cot, temperature):
@@ -128,10 +158,54 @@ def predict(prompt, model, tokenizer, max_length_cot, temperature):
         **inputs,
         max_new_tokens=max_length_cot,
         temperature=temperature,
-        pad_token_id=tokenizer.eos_token_id)
-    generate_ids = generate_ids[0][len(inputs["input_ids"][0]):-1]
-    infer_res = tokenizer.decode(generate_ids)
+        pad_token_id=tokenizer.eos_token_id,
+        output_scores=True, 
+        return_dict_in_generate=True,
+        )
+    infer_res = tokenizer.decode(generate_ids.sequences[0][len(inputs["input_ids"][0]):-1])
     return infer_res
+
+
+# def step_exacts_2_list(response):
+#     # Split response into lines and filter out empty lines
+#     lines = response.splitlines()
+#     lines = [line for line in lines if line.strip()]
+
+#     keywords_by_step = []
+#     contributions_by_step = []
+#     valid_response_text = []
+
+#     for line in lines:
+#         # Match lines starting with "Step X:"
+#         match = re.search(r"Step \d+: (.+)", line)
+#         if match:
+#             # Extract keywords with contributions
+#             keywords_w_contribution = match.group(1).split("; ")
+
+#             # Check for valid format and skip invalid lines
+#             if any("(/" not in key_w_c or "/)" not in key_w_c for key_w_c in keywords_w_contribution):
+#                 continue
+
+#             try:
+#                 # Extract keywords and contributions
+#                 keywords = [key_w_c.split("(/")[0].strip() for key_w_c in keywords_w_contribution]
+#                 contributions = [int(key_w_c.split("(/")[1].split("/)")[0].strip()) for key_w_c in keywords_w_contribution]
+#             except ValueError:
+#                 return False  # Return False if contributions cannot be converted to int
+
+#             for i in contributions:
+#                 if i > 10:
+#                     return False
+
+#             keywords_by_step.append(keywords)
+#             contributions_by_step.append(contributions)
+#             valid_response_text.append(line)  # Add valid lines from the original response
+
+#     # If no valid lines are found, return False
+#     if not valid_response_text:
+#         return False
+
+#     return "\n".join(valid_response_text), keywords_by_step, contributions_by_step
 
 
 def step_exacts_2_list(response):
@@ -147,46 +221,24 @@ def step_exacts_2_list(response):
         # Match lines starting with "Step X:"
         match = re.search(r"Step \d+: (.+)", line)
         if match:
-            if "(/" not in line or "/)" not in line:
-                continue  # Skip invalid lines
+            # Extract keywords
+            keywords = match.group(1).split("; ")
 
-            # Extract keywords with contributions
-            keywords_w_contribution = match.group(1).split("; ")
-
-            # Check for valid format and skip invalid lines
-            if any("(/" not in key_w_c or "/)" not in key_w_c for key_w_c in keywords_w_contribution):
-                continue
-
-            try:
-                # Extract keywords and contributions
-                keywords = [key_w_c.split("(/")[0].strip() for key_w_c in keywords_w_contribution]
-                contributions = [int(key_w_c.split("(/")[1].split("/)")[0].strip()) for key_w_c in keywords_w_contribution]
-            except ValueError:
-                return False  # Return False if contributions cannot be converted to int
-
-            for i in contributions:
-                if i > 10:
-                    return False
+            contributions = [10]*len(keywords)
 
             keywords_by_step.append(keywords)
             contributions_by_step.append(contributions)
             valid_response_text.append(line)  # Add valid lines from the original response
 
-    # If no valid lines are found, return False
-    if not valid_response_text:
-        return False
-
     return "\n".join(valid_response_text), keywords_by_step, contributions_by_step
 
 
 def find_subsequence_position(sub_sequence, long_sequence):
-    len_long = long_sequence.size(0)
+    len_long = len(long_sequence)
     len_sub = len(sub_sequence)
 
-    sub_sequence_tensor = torch.tensor(sub_sequence, device=long_sequence.device)
-
     for i in range(len_long - len_sub + 1):
-        if torch.equal(long_sequence[i:i + len_sub], sub_sequence_tensor):
+        if long_sequence[i:i + len_sub] == sub_sequence:
             return i
     return -1
 
@@ -243,9 +295,9 @@ class ReasoningKeywordsProbs(StatCalculator):
             "reasoning_keywords_contributions",
             "reasoning_keywords_token_ids",
             "reasoning_answer_token_ids",
-        ], ["input_texts"]
+        ], ["input_texts", "greedy_texts", "greedy_tokens", "greedy_log_probs"]
 
-    def __init__(self, max_retries=5, max_length_cot=128, temperature=1):
+    def __init__(self, max_retries=5, max_length_cot=256, temperature=1):
         super().__init__()
         self.max_retries = max_retries
         self.max_length_cot = max_length_cot
@@ -278,51 +330,39 @@ class ReasoningKeywordsProbs(StatCalculator):
                 - 'reasoning_answer_token_ids' (List[Dict[str, List[int]]]): token indices for `reasoning_keywords`.
         """
         result_dict = defaultdict(list)
-        for question in texts:
-            cot_prompt = cot_instruction.replace("<QUESTION>", question)
-
-            inputs = model.tokenizer(cot_prompt, return_tensors="pt")
-            inputs = {key: value.to(model.model.device) for key, value in inputs.items()}
+        batch_input_texts = dependencies['input_texts']
+        batch_generated_texts = dependencies['greedy_texts']
+        batch_generated_tokens = dependencies['greedy_tokens']
+        batch_generated_log_probs = dependencies['greedy_log_probs']
+        for input_text, generated_text, generated_tokens, generated_log_probs in zip(batch_input_texts, batch_generated_texts, batch_generated_tokens, batch_generated_log_probs):
+            question = re.search(r'Question:\s*(.*?)\s*Response:', input_text, re.DOTALL).group(1).strip()
+            # log.info(f"Input texts: {question}")
+            # log.info(f"Generated text: {generated_text}")
             n_of_retries = 0
             while n_of_retries < self.max_retries:
-                outputs = model.generate(
-                    **inputs,
-                    max_new_tokens=self.max_length_cot,
-                    temperature=self.temperature,
-                    pad_token_id=model.tokenizer.eos_token_id,
-                    return_dict_in_generate=True,
-                    output_scores=True,
-                )
-
                 # generated token ids for the question enchanced with CoT.
-                generated_ids = outputs.sequences[0][len(inputs["input_ids"][0]) : -1]
+                generated_ids = generated_tokens
                 # generated text for the question enchaced with CoT
                 to_parse = model.tokenizer.decode(generated_ids, skip_special_tokens=True)
 
                 llm_answer, steps_dict, response = parse_response_to_dict(to_parse)
-                if generated_ids.size(0) >= self.max_length_cot:
-                    # log.debug(f'New Reasoning Tokens Are Too Much, Current try is {n_of_retries + 1}')
+                
+                if len(generated_ids) == 0:
+                    log.info(f'New Reasoning Tokens Are Null, Current try is {n_of_retries + 1}')
                     n_of_retries += 1
                     continue
-                elif generated_ids.size(0) == 0:
-                    # log.debug(f'New Reasoning Tokens Are Null, Current try is {n_of_retries + 1}')
-                    n_of_retries += 1
-                    continue
-                elif llm_answer is None or llm_answer in ["", " "]:
-                    # log.debug(f'New Reasoning Tokens Are None, Current try is {n_of_retries + 1}')
+                if llm_answer is None or llm_answer in ["", " "]:
+                    log.info(f'New Reasoning Tokens Are None, Current try is {n_of_retries + 1}')
                     n_of_retries += 1
                     continue
 
-                # reasoning tokens without final answer
+                # reasoning tokens
                 response_tokens = model.tokenizer.tokenize(response)
-                # reasoning token ids without final answer
-                # response_token_ids = model.tokenizer.convert_tokens_to_ids(response_tokens)
                 # full reasoning tokens
                 original_tokens = model.tokenizer.convert_ids_to_tokens(generated_ids)
-
                 probabilities = [
-                    {i: p for i, p in enumerate(prob[0]) if p > 0}
-                    for prob in [torch.softmax(score, dim=1).tolist() for score in outputs.scores]
+                    {i: p for i, p in enumerate(prob) if p > 0}
+                    for prob in [torch.softmax(torch.from_numpy(score), dim=0).tolist() for score in generated_log_probs]
                 ]
 
                 final_answer_probabilities = {}
@@ -334,7 +374,7 @@ class ReasoningKeywordsProbs(StatCalculator):
                     generated_ids,
                 )
                 if answer_start_indice is None:
-                    # log.debug(f'Cannot locate the Final Answer, Current try is {n_of_retries + 1}')
+                    log.info(f'Cannot locate the Final Answer, Current try is {n_of_retries + 1}')
                     n_of_retries += 1
                     continue
                 answer_probs = []
@@ -350,29 +390,28 @@ class ReasoningKeywordsProbs(StatCalculator):
                     n_of_retries += 1
                     continue
                 final_answer_probabilities[llm_answer] = answer_probs
-                final_answer_token_ids[llm_answer] = answer_token_ids.tolist()
+                final_answer_token_ids[llm_answer] = answer_token_ids
 
                 # exacts_prompt = get_step_exact_tokens(args, q, response)
                 keywords_extraction_prompt = keywords_extraction_instruction.replace('<QUESTION>', question).replace('<RESPONSE>', response)
+                chat = [{"role": "user", "content": keywords_extraction_prompt},]
+                keywords_extraction_prompt = model.tokenizer.apply_chat_template(chat, tokenize=False)
+                
                 keywords_extraction_prompt_output = predict(keywords_extraction_prompt, model, model.tokenizer, self.max_length_cot, self.temperature)
-
-                if "NO ANSWER" in keywords_extraction_prompt_output:
-                    # log.debug(f'Exact Tokens Have NO ANSWER, Current try is {n_of_retries + 1}')
-                    n_of_retries += 1
-                    continue
+                
                 parsed_keywords_output = step_exacts_2_list(keywords_extraction_prompt_output)
                 if not parsed_keywords_output:
-                    # log.debug(f'Exact Tokens Have no contribution scores, Current try is {n_of_retries + 1}')
+                    log.info(f'Exact Tokens Have no contribution scores, Current try is {n_of_retries + 1}')
                     n_of_retries += 1
                     continue
                 extracted_keywords, keywords_list, contributions_list = parsed_keywords_output
                 if len(keywords_list) == 0:
-                    # log.debug(f'Cannot Exract Effective Keywords, Current try is {n_of_retries + 1}')
+                    log.info(f'Cannot Exract Effective Keywords, Current try is {n_of_retries + 1}')
                     n_of_retries += 1
                     continue
 
                 if len(steps_dict) > len(keywords_list):
-                    # log.debug(f'Len of keywords list doesn\'t match the len of step dict, Current try is {n_of_retries + 1}')
+                    log.info(f'Len of keywords list doesn\'t match the len of step dict, Current try is {n_of_retries + 1}')
                     n_of_retries += 1
                     continue
 
@@ -384,9 +423,10 @@ class ReasoningKeywordsProbs(StatCalculator):
                     keywords = keywords_list[step_idx]
                     contributions = contributions_list[step_idx]
                     if len(keywords) == 1 and keywords[0] == "NO ANSWER":
+                        log.info("NO answer")
                         continue
                     step_tokens = model.tokenizer.tokenize(step_text)
-                    space_token = model.tokenizer.tokenize(" ")
+                    space_token = model.tokenizer.tokenize(" ")[0]
                     processed_step_tokens = [
                         (token[1:] if token.startswith(space_token) else token)
                         for token in step_tokens
@@ -401,7 +441,7 @@ class ReasoningKeywordsProbs(StatCalculator):
                         keyword_probs = []
                         keyword_token_ids = []
                         if is_word_in_sentence(step_text, keyword) is not True:
-                            # log.debug(f"\n{step_name}-Keyword-{keyword_idx} Does not appear in the Step Text")
+                            log.info(f"\n{step_name}-Keyword-{keyword_idx} Does not appear in the Step Text")
                             continue
                         keyword_token_start_idx, keyword_token_end_idx = find_token_indices(
                             processed_step_tokens, keyword
@@ -409,21 +449,20 @@ class ReasoningKeywordsProbs(StatCalculator):
                         keyword_token_ids = generated_ids[
                             start_position + keyword_token_start_idx : start_position + keyword_token_end_idx + 1
                         ]
-                        keyword_token_ids = keyword_token_ids.data.cpu().numpy()
 
                         for j, token_id in enumerate(keyword_token_ids):
                             idxx = start_position + keyword_token_start_idx + j
                             keyword_probs.append(probabilities[idxx][token_id])
                         keywords_probabilities_dict[keyword] = keyword_probs
                         keywords_contributions_dict[keyword] = int(contributions[keyword_idx])
-                        keywords_token_ids_dict[keyword] = keyword_token_ids.tolist()
+                        keywords_token_ids_dict[keyword] = keyword_token_ids
 
                     keywords_probabilities[step_name] = keywords_probabilities_dict
                     keywords_contributions[step_name] = keywords_contributions_dict
                     keywords_token_ids[step_name] = keywords_token_ids_dict
 
                 if is_effectively_empty(keywords_probabilities):
-                    # log.debug(f'Token Probability from All Steps are All None, Current try is {n_of_retries + 1}')
+                    log.info(f'Token Probability from All Steps are All None, Current try is {n_of_retries + 1}')
                     n_of_retries += 1
                     continue
 

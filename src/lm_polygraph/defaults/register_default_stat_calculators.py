@@ -47,18 +47,18 @@ def register_default_stat_calculators(
         deberta_model_path = "MoritzLaurer/mDeBERTa-v3-base-xnli-multilingual-nli-2mil7"
 
     _register(InitialStateCalculator)
-    _register(
-        SemanticMatrixCalculator,
-        "lm_polygraph.defaults.stat_calculator_builders.default_SemanticMatrixCalculator",
-        {
-            "nli_model": {
-                "deberta_path": deberta_model_path,
-                "hf_cache": hf_cache,
-                "batch_size": 10,
-                "device": None,
-            }
-        },
-    )
+    # _register(
+    #     SemanticMatrixCalculator,
+    #     "lm_polygraph.defaults.stat_calculator_builders.default_SemanticMatrixCalculator",
+    #     {
+    #         "nli_model": {
+    #             "deberta_path": deberta_model_path,
+    #             "hf_cache": hf_cache,
+    #             "batch_size": 10,
+    #             "device": None,
+    #         }
+    #     },
+    # )
     _register(SemanticClassesCalculator)
 
     if model_type == "Blackbox":
@@ -99,43 +99,43 @@ def register_default_stat_calculators(
         _register(PromptCalculator)
         _register(SamplingPromptCalculator)
         _register(ClaimPromptCalculator)
-        _register(
-            CrossEncoderSimilarityMatrixCalculator,
-            "lm_polygraph.defaults.stat_calculator_builders.default_CrossEncoderSimilarityMatrixCalculator",
-            {
-                "batch_size": 10,
-                "cross_encoder_name": "cross-encoder/stsb-roberta-large",
-            },
-        )
-        _register(
-            GreedyAlternativesNLICalculator,
-            "lm_polygraph.defaults.stat_calculator_builders.default_GreedyAlternativesNLICalculator",
-            {
-                "nli_model": {
-                    "deberta_path": deberta_model_path,
-                    "hf_cache": hf_cache,
-                    "batch_size": 10,
-                    "device": None,
-                }
-            },
-        )
-        _register(
-            GreedyAlternativesFactPrefNLICalculator,
-            "lm_polygraph.defaults.stat_calculator_builders.default_GreedyAlternativesFactPrefNLICalculator",
-            {
-                "nli_model": {
-                    "deberta_path": deberta_model_path,
-                    "hf_cache": hf_cache,
-                    "batch_size": 10,
-                    "device": None,
-                }
-            },
-        )
-        _register(
-            ClaimsExtractor,
-            "lm_polygraph.defaults.stat_calculator_builders.default_ClaimsExtractor",
-            {"openai_model": "gpt-4o", "cache_path": "~/.cache", "language": language},
-        )
+        # _register(
+        #     CrossEncoderSimilarityMatrixCalculator,
+        #     "lm_polygraph.defaults.stat_calculator_builders.default_CrossEncoderSimilarityMatrixCalculator",
+        #     {
+        #         "batch_size": 10,
+        #         "cross_encoder_name": "cross-encoder/stsb-roberta-large",
+        #     },
+        # )
+        # _register(
+        #     GreedyAlternativesNLICalculator,
+        #     "lm_polygraph.defaults.stat_calculator_builders.default_GreedyAlternativesNLICalculator",
+        #     {
+        #         "nli_model": {
+        #             "deberta_path": deberta_model_path,
+        #             "hf_cache": hf_cache,
+        #             "batch_size": 10,
+        #             "device": None,
+        #         }
+        #     },
+        # )
+        # _register(
+        #     GreedyAlternativesFactPrefNLICalculator,
+        #     "lm_polygraph.defaults.stat_calculator_builders.default_GreedyAlternativesFactPrefNLICalculator",
+        #     {
+        #         "nli_model": {
+        #             "deberta_path": deberta_model_path,
+        #             "hf_cache": hf_cache,
+        #             "batch_size": 10,
+        #             "device": None,
+        #         }
+        #     },
+        # )
+        # _register(
+        #     ClaimsExtractor,
+        #     "lm_polygraph.defaults.stat_calculator_builders.default_ClaimsExtractor",
+        #     {"openai_model": "gpt-4o", "cache_path": "~/.cache", "language": language},
+        # )
         _register(
             ReasoningKeywordsProbs,
             "lm_polygraph.defaults.stat_calculator_builders.default_ReasoningKeywordsProbs",

@@ -69,7 +69,6 @@ def weighted_sum(values: List[float]) -> float:
     weights = [math.exp(-c) for c in values]
     sum_weights = sum(weights)
     normalized_weights = [w / sum_weights for w in weights]
-    print(normalized_weights)
     result = sum(w * c for w, c in zip(normalized_weights, values))
     return result
 
