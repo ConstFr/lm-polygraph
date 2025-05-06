@@ -1,0 +1,6 @@
+process_output_fn:
+  path: instruct/output_processing_scripts/hotpot.py
+  fn_name: process_output_cot_hotpot
+process_target_fn:
+  path: instruct/output_processing_scripts/hotpot.py
+  fn_name: process_target_cot_hotpot

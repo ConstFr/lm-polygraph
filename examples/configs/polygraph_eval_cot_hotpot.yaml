@@ -6,6 +6,7 @@ defaults:
   - model: bloomz-560m
   - estimators: cot_estimators
   - stat_calculators: default_calculators
+  - base_processing_hotpot
   - _self_
 
 cache_path: ./workdir/output
@@ -21,12 +22,9 @@ eval_split: validation
 few_shot_prompt: null
 max_new_tokens: 256
 load_from_disk: false
-normalize: true
 trust_remote_code: false
 size: 100
 
-
-output_ignore_regex: "(?s).*Final Answer:"
 
 subsample_eval_dataset: 10
 
