@@ -1,0 +1,13 @@
+- name: MaximumSequenceProbability
+- name: Perplexity
+- name: MeanTokenEntropy
+- name: MeanPointwiseMutualInformation
+- name: MeanConditionalPointwiseMutualInformation 
+- name: PTrue
+- name: PTrueSampling
+- name: MonteCarloSequenceEntropy
+- name: MonteCarloNormalizedSequenceEntropy
+- name: EigenScore
+- name: RenyiNeg
+- name: FisherRao
+- name: ProbasMeanWithCoT

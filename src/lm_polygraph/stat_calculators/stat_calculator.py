@@ -18,7 +18,7 @@ class StatCalculator(ABC):
     UEManager at lm_polygraph.utils.manager will order all the needed calculators and estimators to be called in
     the correct order. Any cycle dependencies among calculators will be spotted by UEManager and end with an exception.
 
-    Each new StatCalculator needs to be registered at lm_polygraph/stat_calculators/__init__.py to be seen be UEManager.
+    Each new StatCalculator needs to be registered at lm_polygraph/stat_calculators/__init__.py to be seen by UEManager.
     """
 
     @staticmethod
