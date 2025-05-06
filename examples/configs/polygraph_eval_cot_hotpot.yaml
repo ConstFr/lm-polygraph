@@ -20,13 +20,13 @@ label_column: answer
 train_split: train
 eval_split: validation
 few_shot_prompt: null
-max_new_tokens: 256
+max_new_tokens: 384
 load_from_disk: false
 trust_remote_code: false
 size: 100
 
 
-subsample_eval_dataset: 10
+subsample_eval_dataset: 20
 
 generation_metrics: null
 

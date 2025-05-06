@@ -5,6 +5,7 @@ CoT_OUTPUT_IGNORE_REGEX = re.compile(r"(?s).*Final Answer:")
 
 def process_output_cot_hotpot(output: str) -> str:
     output = CoT_OUTPUT_IGNORE_REGEX.sub("", output).lower().strip()
+    output = output.translate(str.maketrans("", "", string.punctuation))
     return output
 
 def process_target_cot_hotpot(target: str) -> str:
