@@ -1,0 +1,45 @@
+{
+  "os": "Linux-5.15.0-1081-gcp-x86_64-with-glibc2.31",
+  "python": "CPython 3.11.11",
+  "startedAt": "2025-05-28T09:26:16.708293Z",
+  "args": [
+    "--config-dir=./examples/configs/",
+    "--config-name=polygraph_eval_cot_gsm8k.yaml",
+    "model.path=meta-llama/Llama-3.1-8b"
+  ],
+  "program": "/home/denis/miniconda3/envs/lmpoly/bin/polygraph_eval",
+  "git": {
+    "remote": "https://github.com/ConstFr/lm-polygraph",
+    "commit": "6e7c8d6ad31755a86fa0844e7790caed9f2af2eb"
+  },
+  "email": "deh9123@gmail.com",
+  "root": "/app/denis/lm-polygraph",
+  "host": "agent-bot-dev-vm",
+  "executable": "/home/denis/miniconda3/envs/lmpoly/bin/python",
+  "cpu_count": 4,
+  "cpu_count_logical": 8,
+  "gpu": "NVIDIA L4",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1040442621952",
+      "used": "852913061888"
+    }
+  },
+  "memory": {
+    "total": "33647968256"
+  },
+  "cpu": {
+    "count": 4,
+    "countLogical": 8
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA L4",
+      "memoryTotal": "24152899584",
+      "cudaCores": 7424,
+      "architecture": "Ada"
+    }
+  ],
+  "cudaVersion": "12.2"
+}

@@ -139,7 +139,7 @@ def register_default_stat_calculators(
         _register(
             ReasoningKeywordsProbs,
             "lm_polygraph.defaults.stat_calculator_builders.default_ReasoningKeywordsProbs",
-            {"max_retries": 5, "max_length_cot": 128, "temperature": 1.0}
+            {"max_retries": 5, "max_length_cot": 200, "temperature": 1.0}
         )
 
     else:

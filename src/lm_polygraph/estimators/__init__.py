@@ -77,4 +77,4 @@ from .focus import Focus, FocusClaim
 from .kernel_language_entropy import KernelLanguageEntropy
 from .luq import LUQ
 from .eigenscore import EigenScore
-from .chain_of_thought_uq import ProbasMeanWithCoT
+from .chain_of_thought_uq import ProbasMinWithCoT, StepsMinProb, StepsAvgProb, StepsMaxProb

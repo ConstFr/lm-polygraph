@@ -14,7 +14,8 @@ class MaximumSequenceProbability(Estimator):
     """
 
     def __init__(self):
-        super().__init__(["greedy_log_likelihoods"], "sequence")
+        # super().__init__(["greedy_log_likelihoods"], "sequence")
+        super().__init__(["reasoning_log_likelihoods"], "sequence")
 
     def __str__(self):
         return "MaximumSequenceProbability"
@@ -30,7 +31,8 @@ class MaximumSequenceProbability(Estimator):
             np.ndarray: minus log probabilities for each sample.
                 Higher values indicate more uncertain samples.
         """
-        log_likelihoods = stats["greedy_log_likelihoods"]
+        # log_likelihoods = stats["greedy_log_likelihoods"]
+        log_likelihoods = stats["reasoning_log_likelihoods"]
         return np.array([-np.sum(log_likelihood) for log_likelihood in log_likelihoods])
 
 

@@ -246,7 +246,11 @@ def test_eigenscore(model):
     assert isinstance(ue.uncertainty, float)
 
 def test_probas_mean_with_cot(model):
-    estimator = ProbasMeanWithCoT()
+    estimator = ProbasMinWithCoT()
     ue = estimate_uncertainty(model, estimator, INPUT)
     assert isinstance(ue.uncertainty, float)
 
+def test_steps_max_prob(model):
+    estimator = StepsMinProb()
+    ue = estimate_uncertainty(model, estimator, INPUT)
+    assert isinstance(ue.uncertainty, float)

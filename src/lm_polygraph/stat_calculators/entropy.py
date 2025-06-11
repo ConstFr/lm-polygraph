@@ -17,7 +17,8 @@ class EntropyCalculator(StatCalculator):
         Returns the statistics and dependencies for the calculator.
         """
 
-        return ["entropy"], ["greedy_log_probs"]
+        # return ["entropy"], ["greedy_log_probs"]
+        return ["entropy"], ["reasoning_log_probs"]
 
     def __init__(self):
         super().__init__()
@@ -42,7 +43,8 @@ class EntropyCalculator(StatCalculator):
         Returns:
             Dict[str, np.ndarray]: dictionary with List[List[float]] entropies calculated at 'entropy' key.
         """
-        logprobs = dependencies["greedy_log_probs"]
+        # logprobs = dependencies["greedy_log_probs"]
+        logprobs = dependencies["reasoning_log_probs"]
         entropies = []
         for s_lp in logprobs:
             entropies.append([])

@@ -3,27 +3,27 @@ hydra:
     dir: ${cache_path}/${task}/${model}/${dataset}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 defaults:
-  - model: bloomz-560m
+  - model: llama-3.1-8b-quantized
   - estimators: cot_estimators
   - stat_calculators: default_calculators
-  - base_processing_hotpot
+  - base_processing_gsm8k
   - _self_
 
 cache_path: ./workdir/output
 save_path: '${hydra:run.dir}'
-instruct: true
+instruct: false
 task: qa
 
-dataset: ['denis1699/hotpot_cot']
+dataset: ['denis1699/gsm8k_reasoning']
 text_column: question
 label_column: answer
 train_split: train
-eval_split: validation
+eval_split: test
 few_shot_prompt: null
-max_new_tokens: 384
+max_new_tokens: 256
 load_from_disk: false
 trust_remote_code: false
-size: 101
+size: 100
 
 
 subsample_eval_dataset: 100

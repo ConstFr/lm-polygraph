@@ -44,8 +44,13 @@ class PreprocessOutputTarget(GenerationMetric):
         stats_copy = {k: v for k, v in stats.items() if k in self.stats_dependencies}
         stats_copy = deepcopy(stats_copy)
 
-        stats_copy["greedy_texts"] = [
-            self.process_output_fn(output) for output in stats_copy["greedy_texts"]
-        ]
+        if self.base_metric.__str__() == "AccuracyReasoning":
+            stats_copy["reasoning_answer"] = [
+                self.process_output_fn(output) for output in stats_copy["reasoning_answer"]
+            ]
+        else:
+            stats_copy["greedy_texts"] = [
+                self.process_output_fn(output) for output in stats_copy["greedy_texts"]
+            ]
 
         return self.base_metric(stats_copy, processed_target_texts)

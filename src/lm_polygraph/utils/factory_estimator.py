@@ -46,7 +46,10 @@ def load_simple_estimators(name: str, config):
         ClaimConditionedProbabilityClaim,
         RandomBaselineClaim,
         FocusClaim,
-        ProbasMeanWithCoT,
+        ProbasMinWithCoT,
+        StepsMinProb,
+        StepsAvgProb,
+        StepsMaxProb,
     ]
 
     try:

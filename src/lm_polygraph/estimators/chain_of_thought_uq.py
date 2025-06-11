@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 from .estimator import Estimator
 
 
-def aggregate_probas_mean(
+def aggregate_probas_min(
     keyword_token_probability: Dict[str, Dict[str, List[int]]], contribution_scores: Dict[str, Dict[str, int]] = None
 ) -> Tuple[Dict[str, List[float]], Dict[str, List[float]]]:
     """
@@ -44,8 +44,8 @@ def aggregate_probas_mean(
             if len(values) == 0:
                 continue
             # it is strange that min(values) was in original implementation for probas mean agg. strategy
-            # value_to_add = min(values)
-            value_to_add = np.mean(values)
+            value_to_add = min(values)
+            # value_to_add = np.mean(values)
             if key in return_keyword_dict:
                 return_keyword_dict[key].append(value_to_add)
                 return_contribution_dict[key].append(contribution_scores[step][key])
@@ -53,6 +53,10 @@ def aggregate_probas_mean(
                 return_keyword_dict[key] = [value_to_add]
                 return_contribution_dict[key] = [contribution_scores[step][key]]
     return return_keyword_dict, return_contribution_dict
+
+
+def calculate_max_probability(log_likelihoods: np.ndarray) -> float:
+        return -np.sum(log_likelihoods)
 
 
 def weighted_sum(values: List[float]) -> float:
@@ -73,7 +77,7 @@ def weighted_sum(values: List[float]) -> float:
     return result
 
 
-class ProbasMeanWithCoT(Estimator):
+class ProbasMinWithCoT(Estimator):
     """
     Enhances Probas-Mean aggregated probabilities strategy with reasoning steps.
     Only usabe for instruct-finetuned models with chat template support.
@@ -88,7 +92,7 @@ class ProbasMeanWithCoT(Estimator):
         super().__init__(
             [
                 "input_texts",
-                "greedy_texts",
+                # "greedy_texts",
                 "reasoning_answer",
                 "reasoning_keywords_probabilities",
                 "reasoning_keywords_contributions",
@@ -97,7 +101,7 @@ class ProbasMeanWithCoT(Estimator):
         )
 
     def __str__(self):
-        return f"ProbasMeanWithCoT{self.postfix}"
+        return f"ProbasMinWithCoT{self.postfix}"
 
     def __call__(self, stats: Dict[str, np.ndarray]) -> np.ndarray:
         prompts = stats["input_texts"]
@@ -117,7 +121,7 @@ class ProbasMeanWithCoT(Estimator):
                 ues.append(0.5)
                 continue
 
-            probabilities, contribution_dict = aggregate_probas_mean(keyword_token_probability, contribution_scores)
+            probabilities, contribution_dict = aggregate_probas_min(keyword_token_probability, contribution_scores)
 
             # softmin weighted sum of keywords probs
             probabilities = {key: weighted_sum(value) for key, value in probabilities.items()}
@@ -134,4 +138,145 @@ class ProbasMeanWithCoT(Estimator):
                 confidence = total_sum / total_weight
             ues.append(1 - confidence)
 
+        return np.array(ues)
+
+
+class StepsMinProb(Estimator):
+    """
+    Original method leveraging clearly defined structure of the reasoning output.
+    """
+
+    def __init__(
+        self,
+        name_postfix="",
+    ):
+        self.postfix = name_postfix
+        super().__init__(
+            [
+                "input_texts",
+                "reasoning_steps",
+                "reasoning_log_likelihoods"
+            ],
+            "sequence",
+        )
+
+    def __str__(self):
+        return f"StepsMinProb{self.postfix}"
+    
+    def __call__(self, stats: Dict[str, np.ndarray]) -> np.ndarray:
+        prompts = stats["input_texts"]
+        ues = []
+        for i, question in enumerate(prompts):
+            reasoning_steps = stats["reasoning_steps"][i]
+            reasoning_log_likelihoods = stats['reasoning_log_likelihoods'][i]
+
+            steps_probs = []
+            start_index = 0
+
+            for step, step_text in reasoning_steps.items():
+                tokenized_step = stats["model"].tokenizer.tokenize(step_text, add_special_tokens=True)
+                tokenized_step_length = len(tokenized_step)
+                
+                step_probs = reasoning_log_likelihoods[start_index : start_index + tokenized_step_length]
+                start_index += tokenized_step_length
+                
+                # assert len(step_probs) == tokenized_step_length
+                steps_probs.append(calculate_max_probability(step_probs))
+
+            ues.append(min(steps_probs))
+        
+        return np.array(ues)
+
+
+class StepsMaxProb(Estimator):
+    """
+    Original method leveraging clearly defined structure of the reasoning output.
+    """
+
+    def __init__(
+        self,
+        name_postfix="",
+    ):
+        self.postfix = name_postfix
+        super().__init__(
+            [
+                "input_texts",
+                "reasoning_steps",
+                "reasoning_log_likelihoods"
+            ],
+            "sequence",
+        )
+
+    def __str__(self):
+        return f"StepsMaxProb{self.postfix}"
+    
+    def __call__(self, stats: Dict[str, np.ndarray]) -> np.ndarray:
+        prompts = stats["input_texts"]
+        ues = []
+        for i, question in enumerate(prompts):
+            reasoning_steps = stats["reasoning_steps"][i]
+            reasoning_log_likelihoods = stats['reasoning_log_likelihoods'][i]
+
+            steps_probs = []
+            start_index = 0
+
+            for step, step_text in reasoning_steps.items():
+                tokenized_step = stats["model"].tokenizer.tokenize(step_text, add_special_tokens=True)
+                tokenized_step_length = len(tokenized_step)
+                
+                step_probs = reasoning_log_likelihoods[start_index : start_index + tokenized_step_length]
+                start_index += tokenized_step_length
+                
+                # assert len(step_probs) == tokenized_step_length
+                steps_probs.append(calculate_max_probability(step_probs))
+            
+            ues.append(max(steps_probs))
+            
+        return np.array(ues)
+
+
+class StepsAvgProb(Estimator):
+    """
+    Original method leveraging clearly defined structure of the reasoning output.
+    """
+
+    def __init__(
+        self,
+        name_postfix="",
+    ):
+        self.postfix = name_postfix
+        super().__init__(
+            [
+                "input_texts",
+                "reasoning_steps",
+                "reasoning_log_likelihoods"
+            ],
+            "sequence",
+        )
+
+    def __str__(self):
+        return f"StepsAvgProb{self.postfix}"
+    
+    def __call__(self, stats: Dict[str, np.ndarray]) -> np.ndarray:
+        prompts = stats["input_texts"]
+        ues = []
+        for i, question in enumerate(prompts):
+            reasoning_steps = stats["reasoning_steps"][i]
+            reasoning_log_likelihoods = stats['reasoning_log_likelihoods'][i]
+
+            steps_probs = []
+            start_index = 0
+
+            for step, step_text in reasoning_steps.items():
+                tokenized_step = stats["model"].tokenizer.tokenize(step_text, add_special_tokens=True)
+                tokenized_step_length = len(tokenized_step)
+                
+                step_probs = reasoning_log_likelihoods[start_index : start_index + tokenized_step_length]
+                start_index += tokenized_step_length
+                
+                # assert len(step_probs) == tokenized_step_length
+                steps_probs.append(calculate_max_probability(step_probs))
+            
+            ues.append(np.mean(steps_probs))
+            
         return np.array(ues)
