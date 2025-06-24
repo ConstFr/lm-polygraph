@@ -12,6 +12,7 @@ def process_output_cot_gsm8k(output: str) -> str:
     if match:
         number = float(match[0])
         return str(int(number))
+    output = output.translate(str.maketrans("", "", string.punctuation))
     return output
 
 def process_target_cot_gsm8k(target: str) -> str:

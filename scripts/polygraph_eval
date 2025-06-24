@@ -381,7 +381,6 @@ def get_vllm_model(args):
     load_model_args = {'model_path': args.model.path, 
                        'max_new_tokens': args.max_new_tokens, 
                        'logprobs': args.model.logprobs,
-                       'max_model_len': 8192,
                        }
     
     load_model_args.update(args.model.load_model_args)

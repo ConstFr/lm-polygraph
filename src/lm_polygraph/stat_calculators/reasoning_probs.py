@@ -2,6 +2,8 @@ import re
 import torch
 import warnings
 import numpy as np
+import gc
+
 from collections import defaultdict
 
 from typing import Dict, List, Tuple, Optional
@@ -133,23 +135,24 @@ def parse_response_to_dict(response: str) -> Tuple[Optional[str], Dict[str, str]
             - dictionary of steps (e.g., {"Step 1": "Step 1: ..."}),
             - response before final answer (str or None)
     """
-    steps: Dict[str, str] = {}
+    steps = []
     final_answer: Optional[str] = None
 
     # Match Final Answer
     match = re.search(r"Final Answer:\s*(.+?)\s*(?=(\n|$))", response, re.DOTALL)
     if match:
         final_answer = match.group(1).strip()
-        response_before_final_answer = response[:match.end()].strip()
+        response_before_final_answer = response[:match.start()].strip()
+        final_step = response[match.start():match.end()].strip()
     else:
         matches = list(re.finditer(r'(Step \d+):', response))
         for i, match in enumerate(matches):
             start = match.start()
             end = matches[i + 1].start() if i + 1 < len(matches) else len(response)
             segment = response[start:end].strip()
-            steps[match.group(1)] = segment
+            steps.append(segment)
         if not steps:
-            steps["Step 1:"] = response
+            steps.append(response)
         return None, steps, None
 
     # Match Steps
@@ -158,8 +161,8 @@ def parse_response_to_dict(response: str) -> Tuple[Optional[str], Dict[str, str]
         start = match.start()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(response_before_final_answer)
         segment = response[start:end].strip()
-        steps[match.group(1)] = segment
-
+        steps.append(segment)
+    steps.append(final_step)
     return_response = response_before_final_answer
     return final_answer, steps, return_response
 
@@ -209,7 +212,8 @@ def predict(prompt, model, tokenizer, max_length_cot, temperature):
         output_scores=True, 
         return_dict_in_generate=True,
         )
-    infer_res = tokenizer.decode(generate_ids.sequences[0][len(inputs["input_ids"][0]):-1])
+    infer_res = tokenizer.decode(generate_ids.sequences[0])
+    # infer_res = tokenizer.decode(generate_ids.sequences[0][len(inputs["input_ids"][0]):-1])
     return infer_res
 
 
@@ -309,6 +313,7 @@ def calculate_reasoning_probs(out, inputs, model):
     
     log_probs = logits[0, :length, :].cpu().numpy()
     tokens = seq[:length].tolist()
+
     assert len(tokens) == len(log_probs)
     ll = [log_probs[j, tokens[j]] for j in range(len(log_probs))]
 
@@ -317,6 +322,81 @@ def calculate_reasoning_probs(out, inputs, model):
         "reasoning_log_likelihoods": ll,
     }
     return result_dict
+
+
+class ReasoningProbsCalculator(StatCalculator):
+    """
+    For Whitebox model (lm_polygraph.WhiteboxModel), at input texts batch calculates:
+        * reasoning output text,
+        * reasoning steps text,
+        * reasoning answer text,
+        * reasoning output log probs,
+        * reasoning output log likelihoods`,
+    """
+
+    @staticmethod
+    def meta_info() -> Tuple[List[str], List[str]]:
+        """
+        Returns the statistics and dependencies for the calculator.
+        """
+        return [
+            "reasoning_steps",
+            "reasoning_answer",
+        ], ["input_texts", "greedy_texts", "greedy_log_probs", "greedy_log_likelihoods"]
+
+    def __init__(self, max_retries=20, max_length_cot=384, temperature=1.0):
+        super().__init__()
+        self.max_retries = max_retries
+        self.max_length_cot = max_length_cot
+        self.temperature = temperature
+
+    def __call__(
+        self,
+        dependencies: Dict[str, np.array],
+        texts: List[str],
+        model: WhiteboxModel,
+        max_new_tokens: int = 384,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Calculates the statistics of reasoning enhanced process.
+
+        Parameters:
+            dependencies (Dict[str, np.ndarray]): input statistics, can be empty (not used).
+            texts (List[str]): Input texts batch used for model generation.
+            model (Model): Model used for generation.
+            max_new_tokens (int): Maximum number of new tokens at model generation. Default: 100.
+        Returns:
+            Dict[str, np.ndarray]: dictionary with the following items:
+                # - 'reasoning_output' (List[str]): model output for reasoning prompt,
+                - 'reasoning_steps' (List[str]): reasoning steps from model output,
+                - 'reasoning_answer' (List[str]): reasoning answer for the question,
+        """
+        result_dict = defaultdict(list)
+        batch_input_texts = dependencies['input_texts']
+        batch_greedy_texts = dependencies['greedy_texts']
+        batch_greedy_log_probs = dependencies['greedy_log_probs']
+        batch_greedy_log_likelihoods = dependencies['greedy_log_likelihoods']
+        batch_iter = zip(batch_input_texts, batch_greedy_texts, batch_greedy_log_probs, batch_greedy_log_likelihoods)
+
+        for input_text, greedy_texts, greedy_log_probs, greedy_log_likelihoods in batch_iter:
+            question = re.search(r'Question:\s*(.*?)\s*Response:', input_text, re.DOTALL).group(1).strip()
+            
+            log.info(f"Generated tokens: {input_text + greedy_texts}")
+            
+            reasoning_answer, steps_dict, reasoning_output = parse_response_to_dict(greedy_texts)
+
+            if not steps_dict:
+                steps_dict.append(reasoning_output)
+            
+            if len(greedy_texts) == 0:
+                reasoning_answer = "None"
+            if reasoning_answer is None or reasoning_answer in ["", " "]:
+                reasoning_answer = "None"
+
+            result_dict["reasoning_steps"].append(steps_dict)
+            result_dict["reasoning_answer"].append(reasoning_answer)
+
+        return result_dict
 
 
 class ReasoningKeywordsProbs(StatCalculator):
@@ -351,7 +431,7 @@ class ReasoningKeywordsProbs(StatCalculator):
             "reasoning_log_likelihoods",
         ], ["input_texts"]
 
-    def __init__(self, max_retries=20, max_length_cot=256, temperature=1.0):
+    def __init__(self, max_retries=20, max_length_cot=384, temperature=1.0):
         super().__init__()
         self.max_retries = max_retries
         self.max_length_cot = max_length_cot
@@ -362,7 +442,7 @@ class ReasoningKeywordsProbs(StatCalculator):
         dependencies: Dict[str, np.array],
         texts: List[str],
         model: WhiteboxModel,
-        max_new_tokens: int = 100,
+        max_new_tokens: int = 384,
     ) -> Dict[str, np.ndarray]:
         """
         Calculates the statistics of reasoning enhanced process.
@@ -395,14 +475,7 @@ class ReasoningKeywordsProbs(StatCalculator):
             inputs = {key: value.to("cuda") for key, value in inputs.items()}
             
             n_of_retries = 0
-            while n_of_retries < self.max_retries:
-                # # generated token ids for the question enhanced with CoT.
-                # generated_ids = generated_tokens
-                # # generated text for the question enhanced with CoT
-                # to_parse = model.tokenizer.decode(generated_ids, skip_special_tokens=True)
-
-                # llm_answer, steps_dict, response = parse_response_to_dict(to_parse)
-                
+            while n_of_retries < self.max_retries:                
                 outputs = model.generate(
                     **inputs, 
                     max_new_tokens = self.max_length_cot, 
@@ -410,26 +483,32 @@ class ReasoningKeywordsProbs(StatCalculator):
                     pad_token_id=model.tokenizer.eos_token_id, 
                     return_dict_in_generate=True, 
                     output_scores=True,
-                    stop_strings="Question:",
-                    tokenizer=model.tokenizer
+                    stop_strings=["Question:"],
+                    tokenizer=model.tokenizer,
+                    # stop=["Question:"],
                 )
                 
                 reasoning_probs = calculate_reasoning_probs(outputs, inputs, model)
                 
                 log.info(f"Generated tokens: {model.tokenizer.decode(outputs.sequences[0])}")
                 generated_ids = outputs.sequences[0][len(inputs["input_ids"][0]):-1]
+                # generated_ids = outputs.sequences[0]
+
                 full_response = model.tokenizer.decode(generated_ids, skip_special_tokens=True)
                 
                 llm_answer, steps_dict, response = parse_response_to_dict(full_response)
                 
+                if not steps_dict:
+                    steps_dict = {"Step 1": llm_answer, "Step 2": llm_answer}
+                
                 if len(generated_ids) == 0:
-                    self.max_length_cot = self.max_length_cot + 32
+                    self.max_length_cot = self.max_length_cot + 128
                     log.info(f'New Reasoning Tokens Are Null, Current try is {n_of_retries + 1}')
                     llm_answer = "None"
                     n_of_retries += 1
                     continue
                 if llm_answer is None or llm_answer in ["", " "]:
-                    self.max_length_cot = self.max_length_cot + 32
+                    self.max_length_cot = self.max_length_cot + 128
                     log.info(f'New Reasoning Tokens Are None, Current try is {n_of_retries + 1}')
                     log.info(f"RESPONSE: {response}")
                     llm_answer = "None"
@@ -441,13 +520,25 @@ class ReasoningKeywordsProbs(StatCalculator):
                 
                 # full reasoning tokens
                 original_tokens = model.tokenizer.convert_ids_to_tokens(generated_ids)
+
+
                 # probabilities = [
                 #     {i: p for i, p in enumerate(prob) if p > 0}
                 #     for prob in [torch.softmax(torch.from_numpy(score), dim=0).tolist() for score in outputs.scores]
                 # ]
+
+                # log.info(f"scores: {len(outputs.scores)} - {outputs.scores}")
+                # log.info(f"scores: {outputs.scores[0].shape}")
+                # probabilities = [
+                #     {i: p for i, p in enumerate(prob[0]) if p > 0}
+                #     for prob in [torch.softmax(score, dim=1).tolist() for score in outputs.scores]
+                # ]
+
+                break
+
                 probabilities = [
-                    {i: p for i, p in enumerate(prob[0]) if p > 0}
-                    for prob in [torch.softmax(score, dim=1).tolist() for score in outputs.scores]
+                    {i: p for i, p in enumerate(prob) if p > 0}
+                    for prob in [torch.softmax(score, dim=0).tolist() for score in outputs.scores[0]]
                 ]
 
                 final_answer_probabilities = {}
@@ -464,6 +555,10 @@ class ReasoningKeywordsProbs(StatCalculator):
                     continue
                 answer_probs = []
                 flag = False
+                
+                # log.info(f"probabilities: {len(probabilities)} - {probabilities}")
+                # log.info(f"answer: {answer_start_indice} - {answer_token_ids}")
+                
                 for j, token_id in enumerate(answer_token_ids):
                     idxx = j + answer_start_indice
                     if token_id not in probabilities[idxx].keys():
@@ -574,19 +669,98 @@ class ReasoningKeywordsProbs(StatCalculator):
                 result_dict["reasoning_log_likelihoods"].append(reasoning_probs['reasoning_log_likelihoods'])
                 break
 
-            if n_of_retries >= self.max_retries:
-                log.info(f'#####The Following Question:#####\n{question}\nHas no Meaningful Answer & Explanations, Record and Skip')
-                result_dict["reasoning_output"].append(full_response)
-                result_dict["reasoning_steps"].append(steps_dict)
-                result_dict["reasoning_answer"].append(llm_answer)
-                result_dict["reasoning_answer_tokens_probs"].append(None)
-                result_dict["reasoning_keywords"].append(None)
-                result_dict["reasoning_keywords_probabilities"].append(None)
-                result_dict["reasoning_keywords_contributions"].append(None)
-                result_dict["reasoning_keywords_token_ids"].append(None)
-                result_dict["reasoning_answer_token_ids"].append(None)
+            # if n_of_retries >= self.max_retries:
+            # log.info(f'#####The Following Question:#####\n{question}\nHas no Meaningful Answer & Explanations, Record and Skip')
+            result_dict["reasoning_output"].append(full_response)
+            result_dict["reasoning_steps"].append(steps_dict)
+            result_dict["reasoning_answer"].append(llm_answer)
+            result_dict["reasoning_answer_tokens_probs"].append(None)
+            result_dict["reasoning_keywords"].append(None)
+            result_dict["reasoning_keywords_probabilities"].append(None)
+            result_dict["reasoning_keywords_contributions"].append(None)
+            result_dict["reasoning_keywords_token_ids"].append(None)
+            result_dict["reasoning_answer_token_ids"].append(None)
+            
+            result_dict["reasoning_log_probs"].append(reasoning_probs['reasoning_log_probs'])
+            result_dict["reasoning_log_likelihoods"].append(reasoning_probs['reasoning_log_likelihoods'])
+
+        return result_dict
+
+
+class ReasoningStepsNLI(StatCalculator):
+    """
+    For Whitebox model (lm_polygraph.WhiteboxModel), at input texts batch calculates:
+    """
+
+    @staticmethod
+    def meta_info() -> Tuple[List[str], List[str]]:
+        """
+        Returns the statistics and dependencies for the calculator.
+        """
+        return [
+            "reasoning_step_to_question_nli",
+            "reasoning_step_to_step_nli"
+        ], ["input_texts", "reasoning_steps", "greedy_log_likelihoods"]
+
+    def __init__(self, nli_model):
+        super().__init__()
+        self.nli_model = nli_model
+        self.device = nli_model.deberta.device
+
+    def _calculate_nli_score(self, premise, hypothesis):
+        inputs = self.nli_model.deberta_tokenizer(premise, hypothesis, truncation=True, return_tensors="pt")
+        output = self.nli_model.deberta(inputs["input_ids"].to(self.device))
+        prediction = torch.softmax(output["logits"][0], -1).tolist()
+        label_names = ["entail", "neutral", "contra"]
+        prediction = {name: pred for pred, name in zip(prediction, label_names)}
+        return prediction
+
+    def __call__(
+        self,
+        dependencies: Dict[str, np.array],
+        texts: List[str],
+        model: WhiteboxModel,
+        max_new_tokens: int = 384,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Calculates the statistics of reasoning enhanced process.
+
+        Parameters:
+            dependencies (Dict[str, np.ndarray]): input statistics, can be empty (not used).
+            texts (List[str]): Input texts batch used for model generation.
+            model (Model): Model used for generation.
+        Returns:
+            Dict[str, np.ndarray]: dictionary with the following items:
                 
-                result_dict["reasoning_log_probs"].append(reasoning_probs['reasoning_log_probs'])
-                result_dict["reasoning_log_likelihoods"].append(reasoning_probs['reasoning_log_likelihoods'])
+        """
+        result_dict = defaultdict(list)
+        batch_input_texts = dependencies['input_texts']
+        batch_reasoning_steps = dependencies['reasoning_steps']
+        batch_greedy_log_likelihoods = dependencies['greedy_log_likelihoods']
+        for input_text, reasoning_steps, greedy_log_likelihoods in zip(batch_input_texts, batch_reasoning_steps, batch_greedy_log_likelihoods):
+            reasoning_step_to_question_nli = []
+            reasoning_step_to_step_nli = []
+
+            question = re.search(r'Question:\s*(.*?)\s*Response:', input_text, re.DOTALL).group(1).strip()
+            
+            for step_text in reasoning_steps:
+                # prevent oom
+                step_text = step_text[:1500]
+
+                step_to_question_nli_score = self._calculate_nli_score(question, step_text)
+                reasoning_step_to_question_nli.append(step_to_question_nli_score)
+                
+                step_to_step_scores = []
+                for next_step_text in reasoning_steps:
+                    # prevent oom
+                    next_step_text = next_step_text[:1500]
+
+                    step_to_step_score = self._calculate_nli_score(step_text, next_step_text)
+                    step_to_step_scores.append(step_to_step_score)
+                
+                reasoning_step_to_step_nli.append(step_to_step_scores)
+
+            result_dict["reasoning_step_to_question_nli"].append(reasoning_step_to_question_nli)
+            result_dict["reasoning_step_to_step_nli"].append(reasoning_step_to_step_nli)
 
         return result_dict

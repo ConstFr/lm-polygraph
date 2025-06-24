@@ -29,4 +29,4 @@ from .cross_encoder_similarity import CrossEncoderSimilarityMatrixCalculator
 from .extract_claims import ClaimsExtractor
 from .infer_causal_lm_calculator import InferCausalLMCalculator
 from .semantic_classes import SemanticClassesCalculator
-from .reasoning_keywords_probs import ReasoningKeywordsProbs
+from .reasoning_probs import ReasoningKeywordsProbs, ReasoningProbsCalculator, ReasoningStepsNLI

@@ -1,0 +1,12 @@
+defaults:
+  - default
+
+path: meta-llama/Llama-3.1-8B
+type: vLLMCausalLM
+path_to_load_script: model/default_vllm.py
+logprobs: 20
+
+load_model_args:
+  gpu_memory_utilization: 0.8
+
+device: cuda

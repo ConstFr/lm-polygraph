@@ -75,7 +75,7 @@ def register_default_stat_calculators(
                         "deberta_path": deberta_model_path,
                         "hf_cache": hf_cache,
                         "batch_size": 10,
-                        "device": None,
+                        "device": "cuda",
                     }
                 },
             )
@@ -136,10 +136,30 @@ def register_default_stat_calculators(
         #     "lm_polygraph.defaults.stat_calculator_builders.default_ClaimsExtractor",
         #     {"openai_model": "gpt-4o", "cache_path": "~/.cache", "language": language},
         # )
+
+        # _register(
+        #     ReasoningKeywordsProbs,
+        #     "lm_polygraph.defaults.stat_calculator_builders.default_ReasoningKeywordsProbs",
+        #     {"max_retries": 5, "max_length_cot": 384, "temperature": 1.0}
+        # )
+
         _register(
-            ReasoningKeywordsProbs,
-            "lm_polygraph.defaults.stat_calculator_builders.default_ReasoningKeywordsProbs",
-            {"max_retries": 5, "max_length_cot": 200, "temperature": 1.0}
+            ReasoningProbsCalculator,
+            "lm_polygraph.defaults.stat_calculator_builders.default_ReasoningProbsCalculator",
+            {"max_retries": 1, "max_length_cot": 512, "temperature": 1.0}
+        )
+
+        _register(
+            ReasoningStepsNLI,
+            "lm_polygraph.defaults.stat_calculator_builders.default_ReasoningStepsNLI",
+            {
+                "nli_model": {
+                    "deberta_path": deberta_model_path,
+                    "hf_cache": hf_cache,
+                    "batch_size": 1,
+                    "device": 'cuda:1',
+                }
+            },
         )
 
     else:

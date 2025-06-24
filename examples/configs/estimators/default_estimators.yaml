@@ -87,3 +87,12 @@
 - name: StepsMinProb
 - name: StepsAvgProb
 - name: StepsMaxProb
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "mean"
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "min"
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "max"

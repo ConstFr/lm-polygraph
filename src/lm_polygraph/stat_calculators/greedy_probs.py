@@ -75,6 +75,7 @@ class GreedyProbsCalculator(StatCalculator):
         batch: Dict[str, torch.Tensor] = model.tokenize(texts)
         batch = {k: v.to(model.device()) for k, v in batch.items()}
         with torch.no_grad():
+
             out = model.generate(
                 **batch,
                 output_scores=True,
@@ -93,6 +94,7 @@ class GreedyProbsCalculator(StatCalculator):
                         if "\n" in model.tokenizer.decode([t])
                     ]
                 ),
+                # stop=["Question:"],
             )
             logits = torch.stack(out.scores, dim=1)
             if model.model_type == "vLLMCausalLM":

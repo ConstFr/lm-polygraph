@@ -47,9 +47,11 @@ def load_simple_estimators(name: str, config):
         RandomBaselineClaim,
         FocusClaim,
         ProbasMinWithCoT,
-        StepsMinProb,
-        StepsAvgProb,
-        StepsMaxProb,
+        StepsMaxSequenceProbability,
+        StepsMaxTokenEntropy,
+        StepsPerplexity,
+        Step2QuestionNLI,
+        Step2StepNLI,
     ]
 
     try:

@@ -3,7 +3,7 @@ hydra:
     dir: ${cache_path}/${task}/${model}/${dataset}/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
 defaults:
-  - model: llama-3.1-8b-quantized
+  - model: llama-3.1-8b
   - estimators: cot_estimators
   - stat_calculators: default_calculators
   - base_processing_gsm8k
@@ -20,15 +20,18 @@ label_column: answer
 train_split: train
 eval_split: test
 few_shot_prompt: null
-max_new_tokens: 256
+max_new_tokens: 512
 load_from_disk: false
 trust_remote_code: false
-size: 100
 
 
-subsample_eval_dataset: 100
+subsample_eval_dataset: -1
 
 generation_metrics: null
+
+generation_params:
+  generate_until:
+    - "Question:"
 
 ignore_exceptions: false
 

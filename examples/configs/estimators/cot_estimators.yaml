@@ -1,7 +1,108 @@
 - name: MaximumSequenceProbability
 - name: Perplexity
 - name: MeanTokenEntropy
-- name: ProbasMinWithCoT
-- name: StepsMinProb
-- name: StepsAvgProb
-- name: StepsMaxProb
+
+- name: StepsMaxSequenceProbability
+  cfg:
+    aggregation: "mean"
+- name: StepsMaxSequenceProbability
+  cfg:
+    aggregation: "min"
+- name: StepsMaxSequenceProbability
+  cfg:
+    aggregation: "max"
+- name: StepsMaxSequenceProbability
+  cfg:
+    aggregation: "prod"
+
+- name: StepsMaxTokenEntropy
+  cfg:
+    aggregation: "mean"
+- name: StepsMaxTokenEntropy
+  cfg:
+    aggregation: "min"
+- name: StepsMaxTokenEntropy
+  cfg:
+    aggregation: "max"
+- name: StepsMaxTokenEntropy
+  cfg:
+    aggregation: "prod"
+
+- name: StepsPerplexity
+  cfg:
+    aggregation: "mean"
+- name: StepsPerplexity
+  cfg:
+    aggregation: "min"
+- name: StepsPerplexity
+  cfg:
+    aggregation: "max"
+- name: StepsPerplexity
+  cfg:
+    aggregation: "prod"
+
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "mean"
+    affinity: "entail"
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "min"
+    affinity: "entail"
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "max"
+    affinity: "entail"
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "prod"
+    affinity: "entail"
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "mean"
+    affinity: "contra"
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "min"
+    affinity: "contra"
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "max"
+    affinity: "contra"
+- name: Step2QuestionNLI
+  cfg:
+    aggregation: "prod"
+    affinity: "contra"
+
+- name: Step2StepNLI
+  cfg:
+    aggregation: "mean"
+    affinity: "entail"
+- name: Step2StepNLI
+  cfg:
+    aggregation: "min"
+    affinity: "entail"
+- name: Step2StepNLI
+  cfg:
+    aggregation: "max"
+    affinity: "entail"
+- name: Step2StepNLI
+  cfg:
+    aggregation: "degmat"
+    affinity: "entail"
+- name: Step2StepNLI
+  cfg:
+    aggregation: "mean"
+    affinity: "contra"
+- name: Step2StepNLI
+  cfg:
+    aggregation: "min"
+    affinity: "contra"
+- name: Step2StepNLI
+  cfg:
+    aggregation: "max"
+    affinity: "contra"
+- name: Step2StepNLI
+  cfg:
+    aggregation: "degmat"
+    affinity: "contra"
