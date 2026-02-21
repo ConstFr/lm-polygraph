@@ -148,6 +148,7 @@ def register_default_stat_calculators(
             },
         )
         _register(AttentionForwardPassCalculator)
+        _register(AllHiddenStatesCalculator)
     elif model_type == "VisualLM":
         _register(
             GreedyProbsVisualCalculator,

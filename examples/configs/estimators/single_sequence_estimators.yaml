@@ -1,0 +1,34 @@
+- name: MaximumSequenceProbability
+- name: Perplexity
+- name: MeanTokenEntropy
+# - name: AttentionScore
+#   cfg:
+#     gen_only: False
+# - name: RAUQ
+#   cfg:
+#     alpha: 0.2
+#     use_entropy: False
+# - name: RAUQ
+#   cfg:
+#     alpha: 0.8
+#     use_entropy: True
+- name: HiddenDynamics
+  cfg:
+    layer_idx: 19
+    head_idx: -1
+- name: HiddenDynamics
+  cfg:
+    layer_idx: -2
+    head_idx: 19
+# - name: HiddenDynamics
+#   cfg:
+#     layer_idx: 19
+#     head_idx: 19
+# - name: HiddenDynamics
+#   cfg:
+#     layer_idx: 21
+#     head_idx: -1
+# - name: HiddenDynamics
+#   cfg:
+#     layer_idx: 21
+#     head_idx: 21

@@ -1,0 +1,6 @@
+process_output_fn:
+  path: instruct/output_processing_scripts/mmlu_reasoning.py
+  fn_name: process_output_mmlu_reasoning
+process_target_fn:
+  path: instruct/output_processing_scripts/mmlu_reasoning.py
+  fn_name: process_target_mmlu_reasoning
