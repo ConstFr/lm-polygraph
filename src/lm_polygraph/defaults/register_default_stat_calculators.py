@@ -53,7 +53,7 @@ def register_default_stat_calculators(
         "deberta_path": deberta_model_path,
         "hf_cache": hf_cache,
         "batch_size": deberta_batch_size,
-        "device": None,
+        "device": 1,
     }
 
     _register(InitialStateCalculator)

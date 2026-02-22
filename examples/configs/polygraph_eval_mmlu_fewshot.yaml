@@ -15,11 +15,11 @@ save_path: '${hydra:run.dir}'
 instruct: false
 task: qa
 
-dataset: ['denis1699/mmlu_reasoning']
+dataset: ['UGRIP-LM-Polygraph/mmlu-reasoning']
 text_column: question
 label_column: answer
-train_split: train
-eval_split: test
+train_split: test
+eval_split: validation
 few_shot_prompt: null
 max_new_tokens: 512
 load_from_disk: false
@@ -34,7 +34,6 @@ generation_params:
   generate_until:
     - "Q:"
     - "Question:"
-    - "\n\n"
 
 ignore_exceptions: false
 
