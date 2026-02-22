@@ -181,10 +181,10 @@ def main(args):
 
 def get_ue_metrics(args):
     ue_metrics = [
-        PredictionRejectionArea(),
+        # PredictionRejectionArea(),
         PredictionRejectionArea(max_rejection=0.5),
-        IsotonicPCC(),
-        ECE(normalize=True),
+        # IsotonicPCC(),
+        # ECE(normalize=True),
     ]
     if getattr(args, "use_claim_ue", False):
         ue_metrics += [
@@ -255,33 +255,33 @@ def get_generation_metrics(args):
     ignore_regex = getattr(args, "source_ignore_regex", None)
     if not generation_metrics:
         result = [
-            RougeMetric("rouge1"),
-            RougeMetric("rouge2"),
-            RougeMetric("rougeL"),
-            BLEUMetric(),
-            BertScoreMetric(),
-            SbertMetric(),
+            # RougeMetric("rouge1"),
+            # RougeMetric("rouge2"),
+            # RougeMetric("rougeL"),
+            # BLEUMetric(),
+            # BertScoreMetric(),
+            # SbertMetric(),
             AccuracyMetric(
                 target_ignore_regex=getattr(args, "target_ignore_regex", None),
                 output_ignore_regex=getattr(args, "output_ignore_regex", None),
                 normalize=getattr(args, "normalize", False),
             ),
         ]
-        if args.task == "ats":
-            result += [AlignScore(target_is_claims=False, source_ignore_regex=ignore_regex, source_as_target=True)]
-        else:
-            result += [AlignScore(target_is_claims=True)]
-        if getattr(args.model, "type", "Whitebox") != "Blackbox":
-            if getattr(args, "use_claim_ue", False):
-                result += [
-                    OpenAIFactCheck(
-                        cache_path=args.cache_path,
-                        language=getattr(args, "language", "en"),
-                        n_threads=getattr(args, "n_threads", 1),
-                    )
-                ]
-        if args.task == "nmt":
-            result += [Comet(source_ignore_regex=ignore_regex)]
+        # if args.task == "ats":
+        #     result += [AlignScore(target_is_claims=False, source_ignore_regex=ignore_regex, source_as_target=True)]
+        # else:
+        #     result += [AlignScore(target_is_claims=True)]
+        # if getattr(args.model, "type", "Whitebox") != "Blackbox":
+        #     if getattr(args, "use_claim_ue", False):
+        #         result += [
+        #             OpenAIFactCheck(
+        #                 cache_path=args.cache_path,
+        #                 language=getattr(args, "language", "en"),
+        #                 n_threads=getattr(args, "n_threads", 1),
+        #             )
+        #         ]
+        # if args.task == "nmt":
+        #     result += [Comet(source_ignore_regex=ignore_regex)]
     else:
         result = []
         for metric in generation_metrics:
